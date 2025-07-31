@@ -1,204 +1,204 @@
+```c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
-#define MAX_LEN 100
+#define MAX_URL 100
+#define MAX_TIME 20
 
-typedef struct Node {
-    char bookTitle[MAX_LEN];
-    struct Node* next;
-} Node;
+typedef struct Operation {
+    char url[MAX_URL];
+    char timestamp[MAX_TIME];
+    struct Operation* next;
+    struct Operation* prev;
+} Operation;
 
 typedef struct Stack {
-    Node* top;
+    Operation* top;
 } Stack;
 
-typedef struct Queue {
-    Node* front;
-    Node* rear;
-} Queue;
+typedef struct DoublyLinkedList {
+    Operation* head;
+    Operation* tail;
+} DoublyLinkedList;
 
-void initStack(Stack* s) {
-    s->top = NULL;
+void getCurrentTime(char* buffer) {
+    time_t rawtime;
+    struct tm* timeinfo;
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    strftime(buffer, MAX_TIME, "%Y-%m-%d %H:%M:%S", timeinfo);
 }
 
-void initQueue(Queue* q) {
-    q->front = NULL;
-    q->rear = NULL;
+Operation* createOperation(char* url) {
+    Operation* op = (Operation*)malloc(sizeof(Operation));
+    strncpy(op->url, url, MAX_URL - 1);
+    op->url[MAX_URL - 1] = '\0';
+    getCurrentTime(op->timestamp);
+    op->next = NULL;
+    op->prev = NULL;
+    return op;
 }
 
-int isStackEmpty(Stack* s) {
-    return s->top == NULL;
+void initStack(Stack* stack) {
+    stack->top = NULL;
 }
 
-int isQueueEmpty(Queue* q) {
-    return q->front == NULL;
+void push(Stack* stack, Operation* op) {
+    op->next = stack->top;
+    stack->top = op;
 }
 
-void push(Stack* s, char* title) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    strcpy(newNode->bookTitle, title);
-    newNode->next = s->top;
-    s->top = newNode;
+Operation* pop(Stack* stack) {
+    if (!stack->top) return NULL;
+    Operation* temp = stack->top;
+    stack->top = temp->next;
+    temp->next = NULL;
+    return temp;
 }
 
-void enqueue(Queue* q, char* title) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    strcpy(newNode->bookTitle, title);
-    newNode->next = NULL;
-    if (isQueueEmpty(q)) {
-        q->front = q->rear = newNode;
-    } else {
-        q->rear->next = newNode;
-        q->rear = newNode;
+void clearStack(Stack* stack) {
+    while (stack->top) {
+        Operation* temp = pop(stack);
+        free(temp);
     }
 }
 
-char* pop(Stack* s) {
-    if (isStackEmpty(s)) return NULL;
-    Node* temp = s->top;
-    char* title = (char*)malloc(MAX_LEN * sizeof(char));
-    strcpy(title, temp->bookTitle);
-    s->top = temp->next;
-    free(temp);
-    return title;
+void initList(DoublyLinkedList* list) {
+    list->head = NULL;
+    list->tail = NULL;
 }
 
-char* dequeue(Queue* q) {
-    if (isQueueEmpty(q)) return NULL;
-    Node* temp = q->front;
-    char* title = (char*)malloc(MAX_LEN * sizeof(char));
-    strcpy(title, temp->bookTitle);
-    q->front = temp->next;
-    if (q->front == NULL) q->rear = NULL;
-    free(temp);
-    return title;
-}
-
-void viewRecentBook(Stack* s) {
-    if (isStackEmpty(s)) {
-        printf("Khong co sach dang mo\n");
+void appendList(DoublyLinkedList* list, Operation* op) {
+    if (!list->head) {
+        list->head = list->tail = op;
     } else {
-        printf("Sach gan nhat: %s\n", s->top->bookTitle);
+        op->prev = list->tail;
+        list->tail->next = op;
+        list->tail = op;
     }
 }
 
-void displayClosedBooks(Queue* q) {
-    if (isQueueEmpty(q)) {
-        printf("Khong co sach da dong\n");
+void clearList(DoublyLinkedList* list) {
+    Operation* current = list->head;
+    while (current) {
+        Operation* temp = current;
+        current = current->next;
+        free(temp);
+    }
+    list->head = list->tail = NULL;
+}
+
+void visit(Stack* back, Stack* forward, DoublyLinkedList* history, char* url) {
+    Operation* op = createOperation(url);
+    push(back, op);
+    appendList(history, createOperation(url));
+    clearStack(forward);
+    printf("truy cap thanh cong %s\n", url);
+}
+
+void backward(Stack* back, Stack* forward, DoublyLinkedList* history) {
+    Operation* current = pop(back);
+    if (!current) {
+        printf("khong the quay lai\n");
         return;
     }
-    Node* current = q->front;
-    printf("Lich su dong sach:\n");
-    while (current != NULL) {
-        printf("- %s\n", current->bookTitle);
+    push(forward, current);
+    if (back->top) {
+        printf("quay lai %s\n", back->top->url);
+    } else {
+        printf("khong co trang truoc do\n");
+    }
+}
+
+void forward(Stack* back, Stack* forward, DoublyLinkedList* history) {
+    Operation* current = pop(forward);
+    if (!current) {
+        printf("khong the di toi\n");
+        return;
+    }
+    push(back, current);
+    printf("di toi %s\n", current->url);
+}
+
+void current(Stack* back) {
+    if (!back->top) {
+        printf("khong co trang web dang xem\n");
+        return;
+    }
+    printf("trang hien tai %s\n", back->top->url);
+}
+
+void printHistory(DoublyLinkedList* history) {
+    if (!history->head) {
+        printf("lich su trong\n");
+        return;
+    }
+    Operation* current = history->head;
+    while (current) {
+        printf("%s %s\n", current->timestamp, current->url);
         current = current->next;
     }
 }
 
-void displayOpenBooks(Stack* s) {
-    if (isStackEmpty(s)) {
-        printf("Khong co sach dang mo\n");
-        return;
-    }
-    Node* current = s->top;
-    printf("Cac sach dang mo:\n");
-    while (current != NULL) {
-        printf("- %s\n", current->bookTitle);
-        current = current->next;
-    }
-}
-
-void freeStack(Stack* s) {
-    while (!isStackEmpty(s)) {
-        pop(s);
-    }
-}
-
-void freeQueue(Queue* q) {
-    while (!isQueueEmpty(q)) {
-        dequeue(q);
-    }
-}
-
-void displayMenu() {
-    printf("\n--- QUAN LY SACH DIEN TU ---\n");
-    printf("1. Mo sach moi\n");
-    printf("2. Dong sach hien tai\n");
-    printf("3. Xem sach dang doc gan nhat\n");
-    printf("4. Lich su dong sach\n");
-    printf("5. Khoi phuc sach\n");
-    printf("6. Hien thi cac sach dang mo\n");
-    printf("7. Thoat\n");
-    printf("Nhap lua chon: ");
-}
-
-void openNewBook(Stack* s) {
-    char title[MAX_LEN];
-    printf("Nhap ten sach: ");
-    fgets(title, MAX_LEN, stdin);
-    title[strcspn(title, "\n")] = 0;
-    push(s, title);
-    printf("Da mo sach: %s\n", title);
-}
-
-void closeCurrentBook(Stack* s, Queue* q) {
-    char* poppedTitle = pop(s);
-    if (poppedTitle) {
-        enqueue(q, poppedTitle);
-        printf("Da dong sach: %s\n", poppedTitle);
-        free(poppedTitle);
-    } else {
-        printf("Khong co sach dang mo de dong\n");
-    }
-}
-
-void restoreBook(Stack* s, Queue* q) {
-    char* dequeuedTitle = dequeue(q);
-    if (dequeuedTitle) {
-        push(s, dequeuedTitle);
-        printf("Da khoi phuc sach: %s\n", dequeuedTitle);
-        free(dequeuedTitle);
-    } else {
-        printf("Khong co sach da dong de khoi phuc\n");
-    }
-}
-
-void exitProgram(Stack* s, Queue* q) {
-    freeStack(s);
-    freeQueue(q);
-    printf("Da thoat chuong trinh\n");
+int getCommandIndex(char* command) {
+    if (strcmp(command, "VISIT") == 0) return 1;
+    if (strcmp(command, "BACKWARD") == 0) return 2;
+    if (strcmp(command, "FORWARD") == 0) return 3;
+    if (strcmp(command, "CURRENT") == 0) return 4;
+    if (strcmp(command, "HISTORY") == 0) return 5;
+    if (strcmp(command, "CLEAR") == 0) return 6;
+    if (strcmp(command, "THOAT") == 0) return 7;
+    return 0;
 }
 
 int main() {
-    Stack bookStack;
-    Queue closedBooksQueue;
-    initStack(&bookStack);
-    initQueue(&closedBooksQueue);
-    int choice;
-
-    do {
-        displayMenu();
-        scanf("%d", &choice);
-        getchar();
-        switch (choice) {
-            case 1: openNewBook(&bookStack);
+    Stack back, forward;
+    DoublyLinkedList history;
+    initStack(&back);
+    initStack(&forward);
+    initList(&history);
+    
+    char command[20], url[MAX_URL];
+    
+    while (1) {
+        scanf("%s", command);
+        int cmdIndex = getCommandIndex(command);
+        
+        switch (cmdIndex) {
+            case 1: 
+                scanf("%s", url);
+                visit(&back, &forward, &history, url);
                 break;
-            case 2: closeCurrentBook(&bookStack, &closedBooksQueue);
+            case 2: 
+                backward(&back, &forward, &history);
                 break;
-            case 3: viewRecentBook(&bookStack);
+            case 3: 
+                forward(&back, &forward, &history);
                 break;
-            case 4: displayClosedBooks(&closedBooksQueue);
+            case 4:
+                current(&back);
                 break;
-            case 5: restoreBook(&bookStack, &closedBooksQueue);
+            case 5:
+                printHistory(&history);
                 break;
-            case 6: displayOpenBooks(&bookStack);
+            case 6: 
+                clearList(&history);
+                printf("lich su da xoa\n");
                 break;
-            case 7: exitProgram(&bookStack, &closedBooksQueue);
+            case 7: 
+                clearStack(&back);
+                clearStack(&forward);
+                clearList(&history);
+                printf("thoat chuong trinh\n");
+                return 0;
+            default:
+                printf("lenh khong hop le\n");
                 break;
-            default: printf("Lua chon khong hop le\n");
         }
-    } while (choice != 7);
-
+    }
+    
     return 0;
 }
+```
